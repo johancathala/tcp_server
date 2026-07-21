@@ -64,17 +64,29 @@ function(
     // Lire un bloc de registres de 0x3100 (exemple) et mapper
     $epever = new EpeverClient($conn);
     $start = 0x3100;
-    $count = 32; // lire 32 registres contigus
+    $count = 16; // lire 16 registres contigus
+
+    echo "Lecture registres à partir de l'adresse 0x".dechex($start)." (".$count." registres)\n";
 
     $registers = $epever->readRegisters($start, $count, 4); // fonction 4 (input regs) souvent utilisée
     if ($registers === null) {
         echo "Lecture registres impossible ou CRC invalide\n";
         return;
     }
+    $mapped = $epever->mapRegisters($registers);
+    echo "Paramètres mappés:\n";
+    print_r($mapped);
 
-    echo "Registres bruts (addr => valeur):\n";
-    print_r($registers);
+    $epever = new EpeverClient($conn);
+    $start = 0x3110;
+    $count = 2; // lire 16 registres contigus
 
+    echo "Lecture registres à partir de l'adresse 0x".dechex($start)." (".$count." registres)\n";
+    $registers = $epever->readRegisters($start, $count, 4); // fonction 4 (input regs) souvent utilisée
+    if ($registers === null) {
+        echo "Lecture registres impossible ou CRC invalide\n";
+        return;
+    }
     $mapped = $epever->mapRegisters($registers);
     echo "Paramètres mappés:\n";
     print_r($mapped);
