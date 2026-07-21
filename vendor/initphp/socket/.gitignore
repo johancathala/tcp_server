@@ -1,0 +1,10 @@
+/.idea/
+/.vs/
+/.vscode/
+/vendor/
+/composer.lock
+/build/
+/coverage/
+/.phpunit.cache/
+/.phpstan-cache/
+/.php-cs-fixer.cache

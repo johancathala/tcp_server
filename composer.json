@@ -1,0 +1,11 @@
+{
+    "require": {
+        "nesbot/carbon": "^3.13",
+        "initphp/socket": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Epever\\": "lib/Epever"
+        }
+    }
+}
