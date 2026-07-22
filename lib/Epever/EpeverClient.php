@@ -194,33 +194,98 @@ class EpeverClient
     }
 
     /**
+     * Lit une réponse Modbus complète à partir de la socket.
+     */
+    private function readModbusResponse(bool $debug = false): ?string
+    {
+        $buffer = '';
+        $deadline = microtime(true) + 2.0;
+
+        // Lire l'en-tête minimum : slave + function + byte count
+        while (strlen($buffer) < 3 && microtime(true) < $deadline) {
+            $chunk = $this->socket->read(256);
+            if ($chunk === null) {
+                if ($debug) {
+                    echo "    [DEBUG] Réponse NULL (timeout/pas de réponse) pendant l'en-tête)\n";
+                }
+                return null;
+            }
+            $buffer .= $chunk;
+        }
+
+        if (strlen($buffer) < 3) {
+            if ($debug) {
+                echo "    [DEBUG] En-tête incomplet (" . strlen($buffer) . " bytes)\n";
+            }
+            return null;
+        }
+
+        $byteCount = ord($buffer[2]);
+        $expectedLength = 3 + $byteCount + 2; // 3 octets d'entête + données + CRC
+
+        while (strlen($buffer) < $expectedLength && microtime(true) < $deadline) {
+            $chunk = $this->socket->read(256);
+            if ($chunk === null) {
+                if ($debug) {
+                    echo "    [DEBUG] Réponse NULL (timeout/pas de réponse) pendant la lecture complète)\n";
+                }
+                return null;
+            }
+            $buffer .= $chunk;
+        }
+
+        if (strlen($buffer) < $expectedLength) {
+            if ($debug) {
+                echo "    [DEBUG] Trame incomplète (" . strlen($buffer) . " / " . $expectedLength . " bytes)\n";
+            }
+            return null;
+        }
+
+        return substr($buffer, 0, $expectedLength);
+    }
+
+    /**
      * Lire une plage de registres (fonction 03 ou 04), vérifie CRC et retourne
      * un tableau associatif adresse_hex => valeur (entier 16 bits)
      */
-    public function readRegisters(int $address, int $count, int $function = 3): ?array
+    public function readRegisters(int $address, int $count, int $function = 3, $debug = false): ?array
     {
         $frame = pack("CCnn", $this->slaveId, $function, $address, $count);
         $frame .= $this->crc16($frame);
 
+        if ($debug) {
+            echo "    [DEBUG] Requête envoyée : " . bin2hex($frame) . "\n";
+        }
+
         $this->socket->write($frame);
 
-        $response = $this->socket->read(2048);
+        $response = $this->readModbusResponse($debug);
         if ($response === null) {
             return null;
         }
 
-        // Vérifier CRC reçu
+        if ($debug) {
+            echo "    [DEBUG] Réponse reçue (" . strlen($response) . " bytes) : " . bin2hex($response) . "\n";
+        }
+
         if (strlen($response) < 5) {
+            if ($debug) echo "    [DEBUG] Réponse trop courte (" . strlen($response) . " bytes)\n";
             return null;
         }
 
         $body = substr($response, 0, -2);
         $crcRecv = substr($response, -2);
-        if ($this->crc16($body) !== $crcRecv) {
+        $crcCalc = $this->crc16($body);
+
+        if ($debug) {
+            echo "    [DEBUG] CRC reçu: " . bin2hex($crcRecv) . " | CRC calculé: " . bin2hex($crcCalc) . "\n";
+        }
+
+        if ($crcCalc !== $crcRecv) {
+            if ($debug) echo "    [DEBUG] CRC invalide!\n";
             return null;
         }
 
-        // Décodage des registres
         $bytes = unpack("Cslave/Cfunction/Csize", $body);
         $byteCount = $bytes['size'];
         $offset = 3;
@@ -232,10 +297,142 @@ class EpeverClient
         $result = [];
         for ($i = 0; $i < count($values); $i++) {
             $addr = $address + $i;
-            $result[$addr] = $values[$i];
+            $result["0x" . strtoupper(dechex($addr))] = $values[$i];
         }
 
         return $result;
+    }
+
+    /**
+     * Retourne les tables de mapping depuis un fichier de configuration externe.
+     */
+    private function getRegisterMaps(): array
+    {
+        $configFile = dirname(__DIR__, 2) . '/config/epever_registers.php';
+
+        if (!is_file($configFile)) {
+            throw new \RuntimeException("Configuration Modbus manquante : {$configFile}");
+        }
+
+        $maps = require $configFile;
+
+        if (!is_array($maps) || !isset($maps['map'], $maps['pairs'])) {
+            throw new \RuntimeException("Le fichier de configuration Modbus doit retourner [ 'map' => ..., 'pairs' => ... ]");
+        }
+
+        return $maps;
+    }
+
+    /**
+     * Retourne toutes les clés de registres disponibles
+     */
+    public function getAllRegisterKeys(): array
+    {
+        $maps = $this->getRegisterMaps();
+        $keys = [];
+
+        // Clés des registres 16-bit
+        foreach ($maps['map'] as [$key, $scale]) {
+            $keys[] = $key;
+        }
+
+        // Clés des registres 32-bit
+        foreach ($maps['pairs'] as [$key, $scale, $highAddr]) {
+            $keys[] = $key;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Retourne les plages contiguës de registres à lire
+     * Format : [['start' => 0x3100, 'count' => 5], ...]
+     */
+    public function getContiguousRanges(): array
+    {
+        $maps = $this->getRegisterMaps();
+        $addresses = [];
+
+        // Collecter toutes les adresses (16-bit et hautes des 32-bit)
+        foreach ($maps['map'] as $addr => [$key, $scale]) {
+            $addresses[$addr] = true;
+        }
+
+        foreach ($maps['pairs'] as $lowAddr => [$key, $scale, $highAddr]) {
+            $addresses[$lowAddr] = true;
+            $addresses[$highAddr] = true;
+        }
+
+        // Trier les adresses
+        ksort($addresses);
+        $addresses = array_keys($addresses);
+
+        // Grouper en plages contiguës
+        $ranges = [];
+        if (empty($addresses)) {
+            return $ranges;
+        }
+
+        $rangeStart = $addresses[0];
+        $rangeEnd = $addresses[0];
+
+        for ($i = 1; $i < count($addresses); $i++) {
+            if ($addresses[$i] === $rangeEnd + 1) {
+                // Registre contigu
+                $rangeEnd = $addresses[$i];
+            } else {
+                // Fin de plage
+                $ranges[] = [
+                    'start' => $rangeStart,
+                    'count' => $rangeEnd - $rangeStart + 1,
+                ];
+                $rangeStart = $addresses[$i];
+                $rangeEnd = $addresses[$i];
+            }
+        }
+
+        // Ajouter la dernière plage
+        $ranges[] = [
+            'start' => $rangeStart,
+            'count' => $rangeEnd - $rangeStart + 1,
+        ];
+
+        return $ranges;
+    }
+
+    /**
+     * Retourne la map complète avec toutes les informations (adresse, clé, facteur)
+     */
+    public function getAllRegisters(): array
+    {
+        $maps = $this->getRegisterMaps();
+        $all = [];
+
+        // Registres 16-bit
+        foreach ($maps['map'] as $addr => [$key, $scale]) {
+            $all[] = [
+                'type' => '16-bit',
+                'address' => $addr,
+                'address_hex' => '0x' . dechex($addr),
+                'key' => $key,
+                'scale' => $scale,
+            ];
+        }
+
+        // Registres 32-bit
+        foreach ($maps['pairs'] as $lowAddr => [$key, $scale, $highAddr]) {
+            $all[] = [
+                'type' => '32-bit',
+                'address_low' => $lowAddr,
+                'address_low_hex' => '0x' . dechex($lowAddr),
+                'address_high' => $highAddr,
+                'address_high_hex' => '0x' . dechex($highAddr),
+                'key' => $key,
+                'scale' => $scale,
+            ];
+        }
+
+        return $all;
     }
 
     /**
@@ -244,84 +441,22 @@ class EpeverClient
      */
     public function mapRegisters(array $registers): array
     {
-        // Registres 16-bit simples : adresse => [key, scale]
-        $map = [
-            0x3100 => ['pv_array_voltage', 100],
-            0x3101 => ['pv_array_current', 100],
-            0x310C => ['load_voltage', 100],
-            0x310D => ['load_current', 100],
-            0x3110 => ['battery_temperature', 100],
-            0x3111 => ['device_temperature', 100],
-            0x311A => ['battery_soc', 1],
-            0x311D => ['battery_rated_voltage', 100],
-            0x3200 => ['battery_status', 1],
-            0x3201 => ['charging_equipment_status', 1],
-            0x3202 => ['discharging_equipment_status', 1],
-            0x3302 => ['max_battery_voltage_today', 100],
-            0x3303 => ['min_battery_voltage_today', 100],
-            0x3314 => ['battery_voltage', 100],
-            0x3005 => ['rated_charging_current', 100],
-            0x300E => ['rated_load_current', 100],
-            0x9000 => ['battery_type', 1],
-            0x9001 => ['battery_capacity', 100],
-            0x9002 => ['temperature_compensation_coefficient', 2],
-            0x9003 => ['over_voltage_disconnect', 100],
-            0x9004 => ['charging_limit_voltage', 100],
-            0x9005 => ['over_voltage_reconnect', 100],
-            0x9006 => ['equalize_charging_voltage', 100],
-            0x9007 => ['boost_charging_voltage', 100],
-            0x9008 => ['float_charging_voltage', 100],
-            0x9009 => ['boost_reconnect_charging_voltage', 100],
-            0x900A => ['low_voltage_reconnect', 100],
-            0x900B => ['under_voltage_warning_recover', 100],
-            0x900C => ['under_voltage_warning', 100],
-            0x900D => ['low_voltage_disconnect', 100],
-            0x900E => ['discharging_limit_voltage', 100],
-            0x900F => ['battery_rated_voltage_level', 1],
-            0x906A => ['default_load_on_off_manual', 1],
-            0x906B => ['equalize_duration', 1],
-            0x906C => ['boost_duration', 1],
-            0x906D => ['battery_discharge_percent', 1],
-            0x906E => ['battery_charge_percent', 1],
-            0x9070 => ['charging_mode', 1],
-        ];
-
-        // Registres 32-bit pairés : adresse_low => [clé, facteur, adresse_high]
-        $pairs = [
-            0x3102 => ['pv_array_power', 100, 0x3103],
-            0x310E => ['load_power', 100, 0x310F],
-            0x3304 => ['consumed_energy_today', 100, 0x3305],
-            0x3306 => ['consumed_energy_month', 100, 0x3307],
-            0x3308 => ['consumed_energy_year', 100, 0x3309],
-            0x330A => ['total_consumed_energy', 100, 0x330B],
-            0x330C => ['generated_energy_today', 100, 0x330D],
-            0x330E => ['generated_energy_month', 100, 0x330F],
-            0x3310 => ['generated_energy_year', 100, 0x3311],
-            0x3312 => ['total_generated_energy', 100, 0x3313],
-            0x3315 => ['battery_current', 100, 0x3316],
-        ];
+        $maps = $this->getRegisterMaps();
+        $map = $maps['map'];
+        $pairs = $maps['pairs'];
 
         $out = [];
 
-        // Traiter d'abord les paires 32 bits
-        foreach ($pairs as $lowAddr => [$key, $scale, $highAddr]) {
-            if (isset($registers[$lowAddr], $registers[$highAddr])) {
-                $low = $registers[$lowAddr];
-                $high = $registers[$highAddr];
-                $value = ($high << 16) | $low;
-                $out[$key] = $scale !== 0 ? $value / $scale : $value;
-            }
-        }
-
-        // Puis les registres simples
         foreach ($registers as $addr => $value) {
             if (isset($map[$addr])) {
                 [$key, $scale] = $map[$addr];
-                $out[$key] = $scale !== 0 ? $value / $scale : $value;
-            } elseif (!in_array($addr, array_column($pairs, 2), true) && !isset($out[sprintf('reg_0x%04X', $addr)])) {
-                // On ne mémorise pas les registres haut des paires si déjà traités,
-                // et on évite les doublons
-                $out[sprintf('reg_0x%04X', $addr)] = $value;
+                $out[$key."(".$addr.")"] = $scale !== 0 ? $value / $scale : $value;
+            } else if (isset($pairs[$addr])) {
+                // Traiter les registres 32-bit
+                [$key, $scale, $highAddr] = $pairs[$addr];
+                $out[$key."(".$addr."-".$highAddr.")"] = $scale !== 0 ? $value / $scale : $value;              
+            } else {
+                $out[$addr] = $value;
             }
         }
 

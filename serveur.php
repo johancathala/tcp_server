@@ -2,9 +2,6 @@
 
 require __DIR__.'/vendor/autoload.php';
 
-//require __DIR__.'/lib/Epever/EpeverClient.php';
-
-
 use InitPHP\Socket\Socket;
 use InitPHP\Socket\Enum\Transport;
 use InitPHP\Socket\Interfaces\SocketServerInterface;
@@ -49,46 +46,33 @@ function(
     SocketServerInterface $srv,
     SocketConnectionInterface $conn
 ){
+   // echo "Response à la connexion : ".bin2hex($conn->read())."\n";
 
     echo "Client connecté\n";
-
     echo "Id du client : ".$conn->getId()."\n";
     
-    /*
-       Exemple :
-       Lecture registres 0x3100-0x3101
-
-       PV voltage
-       PV current
-    */
-    // Lire un bloc de registres de 0x3100 (exemple) et mapper
     $epever = new EpeverClient($conn);
-    $start = 0x3100;
-    $count = 16; // lire 16 registres contigus
+    
+    $allRegisters = [];
 
-    echo "Lecture registres à partir de l'adresse 0x".dechex($start)." (".$count." registres)\n";
+    $adress = 0x3100;
+    $count = 16;
 
-    $registers = $epever->readRegisters($start, $count, 4); // fonction 4 (input regs) souvent utilisée
-    if ($registers === null) {
-        echo "Lecture registres impossible ou CRC invalide\n";
-        return;
+    $registers = $epever->readRegisters($adress, $count, 4, true);
+     
+    if (is_array($registers)) {
+        $allRegisters = array_merge($allRegisters, $registers);
+    } else {
+        echo "  ⚠️ Aucun registre lu pour 0x".dechex($adress)."\n";
     }
-    $mapped = $epever->mapRegisters($registers);
-    echo "Paramètres mappés:\n";
-    print_r($mapped);
-
-    $epever = new EpeverClient($conn);
-    $start = 0x3110;
-    $count = 2; // lire 16 registres contigus
-
-    echo "Lecture registres à partir de l'adresse 0x".dechex($start)." (".$count." registres)\n";
-    $registers = $epever->readRegisters($start, $count, 4); // fonction 4 (input regs) souvent utilisée
-    if ($registers === null) {
-        echo "Lecture registres impossible ou CRC invalide\n";
-        return;
+    
+    // Mapper tous les registres lus
+    if (!empty($allRegisters)) {
+        echo "\n=== Paramètres mappés ===\n";
+        $mapped = $epever->mapRegisters($allRegisters);
+        foreach ($mapped as $key => $value) {
+            echo $key." : ".$value."\n";
+        }
     }
-    $mapped = $epever->mapRegisters($registers);
-    echo "Paramètres mappés:\n";
-    print_r($mapped);
 
 });
