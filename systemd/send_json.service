@@ -1,0 +1,17 @@
+[Unit]
+Description=Epever JSON uploader service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/application/tcp_serveur
+ExecStart=/usr/bin/php /data/application/tcp_serveur/send_json.php --watch --interval=30
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=send_json
+
+[Install]
+WantedBy=multi-user.target

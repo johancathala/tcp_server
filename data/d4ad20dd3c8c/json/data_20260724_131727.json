@@ -1,0 +1,102 @@
+[
+    {
+        "capteur_id": "pv_array_voltage",
+        "timestamp": 1784899047000,
+        "valeur": 79.41,
+        "unit": "V",
+        "meta": {
+            "addr": "0x3100",
+            "unite": "V"
+        }
+    },
+    {
+        "capteur_id": "pv_array_current",
+        "timestamp": 1784899047000,
+        "valeur": 0.1,
+        "unit": "A",
+        "meta": {
+            "addr": "0x3101",
+            "unite": "A"
+        }
+    },
+    {
+        "capteur_id": "pv_array_power",
+        "timestamp": 1784899047000,
+        "valeur": 8.7,
+        "meta": {
+            "addr": "0x3102",
+            "highAddr": "0x3103",
+            "unite": "W"
+        }
+    },
+    {
+        "capteur_id": "load_voltage",
+        "timestamp": 1784899047000,
+        "valeur": 27.2,
+        "unit": "V",
+        "meta": {
+            "addr": "0x310C",
+            "unite": "V"
+        }
+    },
+    {
+        "capteur_id": "load_current",
+        "timestamp": 1784899047000,
+        "valeur": 0.2,
+        "unit": "A",
+        "meta": {
+            "addr": "0x310D",
+            "unite": "A"
+        }
+    },
+    {
+        "capteur_id": "battery_temperature",
+        "timestamp": 1784899047000,
+        "valeur": 34.6,
+        "unit": "\u00b0C",
+        "meta": {
+            "addr": "0x3110",
+            "unite": "\u00b0C"
+        }
+    },
+    {
+        "capteur_id": "device_temperature",
+        "timestamp": 1784899047000,
+        "valeur": 40.43,
+        "unit": "\u00b0C",
+        "meta": {
+            "addr": "0x3111",
+            "unite": "\u00b0C"
+        }
+    },
+    {
+        "capteur_id": "battery_soc",
+        "timestamp": 1784899047000,
+        "valeur": 98,
+        "unit": "%",
+        "meta": {
+            "addr": "0x311A",
+            "unite": "%"
+        }
+    },
+    {
+        "capteur_id": "battery_voltage",
+        "timestamp": 1784899047000,
+        "valeur": 27.22,
+        "unit": "V",
+        "meta": {
+            "addr": "0x331A",
+            "unite": "V"
+        }
+    },
+    {
+        "capteur_id": "battery_current",
+        "timestamp": 1784899047000,
+        "valeur": 0.1,
+        "meta": {
+            "addr": "0x331B",
+            "highAddr": "0x331C",
+            "unite": "A"
+        }
+    }
+]

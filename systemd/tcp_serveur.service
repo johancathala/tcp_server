@@ -1,0 +1,17 @@
+[Unit]
+Description=TCP Epever Modbus server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/application/tcp_serveur
+ExecStart=/usr/bin/php /data/application/tcp_serveur/serveur.php
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tcp_serveur
+
+[Install]
+WantedBy=multi-user.target

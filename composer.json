@@ -5,7 +5,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Epever\\": "lib/Epever"
+            "Epever\\": "lib/Epever",
+            "Config\\": "config/"
         }
     }
 }

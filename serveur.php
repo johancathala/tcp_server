@@ -9,9 +9,12 @@ use InitPHP\Socket\Interfaces\SocketConnectionInterface;
 use InitPHP\Socket\Exception\SocketException;
 
 use Epever\EpeverClient;
+use Config\ConfigEpever;
 
-$host = '0.0.0.0';
-$port = isset($argv[1]) ? (int) $argv[1] : 82;
+$config = new ConfigEpever();
+
+$host = $config->host;
+$port = $config->port;
 
 $server = Socket::server(
     Transport::TCP,
@@ -38,41 +41,102 @@ try {
 
 echo "TCP server OK\n";
 
-$clients = $server->getClients();
-echo "Clients connectés : ".count($clients)."\n";
-
 $server->live(
 function(
     SocketServerInterface $srv,
     SocketConnectionInterface $conn
 ){
-   // echo "Response à la connexion : ".bin2hex($conn->read())."\n";
+    $config = new ConfigEpever();
+    $list_cmd = $config->get('list_cmd');
+    $pollIntervalSeconds = $config->pollIntervalSeconds;
+    $betweenReadsSeconds = $config->betweenReadsSeconds;
 
-    echo "Client connecté\n";
-    echo "Id du client : ".$conn->getId()."\n";
-    
-    $epever = new EpeverClient($conn);
-    
-    $allRegisters = [];
+    echo "\nClient connecté\n";
 
-    $adress = 0x3100;
-    $count = 16;
-
-    $registers = $epever->readRegisters($adress, $count, 4, true);
-     
-    if (is_array($registers)) {
-        $allRegisters = array_merge($allRegisters, $registers);
+    $testUser = false;
+    $initialData = $conn->read(512);
+    if ($initialData !== null) {
+        $initialData = bin2hex($initialData);
+        echo "Trame d'identification initiale reçue : " . $initialData . "\n";
+        $testUser = $config->testIdMacClient($initialData);
     } else {
-        echo "  ⚠️ Aucun registre lu pour 0x".dechex($adress)."\n";
+        echo "Aucune trame d'identification initiale reçue lors de la connexion.\n";
     }
+
+    if (!$testUser) {
+        echo "⚠️ Identifiant client non reconnu, fermeture de la connexion.\n";
+        $conn->close();
+        
+        echo "\nAttente de {$pollIntervalSeconds} sec avant le prochain cycle de connexion...\n";
+            $srv->wait($pollIntervalSeconds);
+        return;
+    }else {
+        echo "✅ Identifiant client reconnu, démarrage du cycle de lecture Modbus.\n";
+    }
+
+    $directory = __DIR__ . '/data/' . $initialData.'/json/';
+    mkdir($directory,0755,true);
+
+    $epever = new EpeverClient($conn, 1, false);
     
-    // Mapper tous les registres lus
-    if (!empty($allRegisters)) {
-        echo "\n=== Paramètres mappés ===\n";
-        $mapped = $epever->mapRegisters($allRegisters);
-        foreach ($mapped as $key => $value) {
-            echo $key." : ".$value."\n";
+
+    while ($conn->isAlive()) {
+        echo "\n--- Nouveau cycle de lecture Modbus ---\n";
+        $cycleStart = microtime(true);
+
+        echo "Lecture IP client\n";
+        $clientIP = $epever->checkClient();
+        echo "IP client : {$clientIP}\n";
+
+        
+
+        $allRegisters = [];
+        foreach ($list_cmd as $cmd) {
+            $address = $cmd[0];
+            $count = $cmd[1];
+            echo "Lecture du registre pour 0x".dechex($address)."\n";
+            $registers = $epever->readRegisters($address, $count, 4, true);
+            if (!is_array($registers)) {
+                echo "  ⚠️ Aucun registre lu pour 0x".dechex($address)."\n";
+                break;
+            }
+            $allRegisters = array_merge($allRegisters, $registers);
+
+            if ($betweenReadsSeconds > 0) {
+                echo "Attente de {$betweenReadsSeconds} secondes avant la prochaine requête...\n";
+                $srv->wait($betweenReadsSeconds);
+            }
+        }
+
+        if (!empty($allRegisters)) {
+            $mapped = $epever->mapRegisters($allRegisters);
+
+            echo "\n=== Paramètres mappés ===\n";    
+            $valid = json_encode($mapped['valid']);
+            echo $valid."\n";
+            if($valid != "[]"){
+                $filename = $directory . 'data_' . date('Ymd_His') . '.json';
+                file_put_contents($filename, $valid);
+                echo "\nDonnées mappées sauvegardées dans : {$filename}\n";
+            }else{
+                echo "\nAucune donnée mappée à sauvegarder.\n";
+            }
+            
+            echo "\n=== Paramètres non mappés ===\n";
+            $noMap = json_encode($mapped['noMap']);
+            echo $noMap."\n";          
+        }
+
+        $elapsed = microtime(true) - $cycleStart;
+        $remaining = $pollIntervalSeconds - $elapsed;
+        if ($remaining > 0) {
+            echo "\nCycle terminé en " . round($elapsed, 2) . " sec, attente de " . round($remaining, 2) . " sec avant le prochain cycle...\n";
+            $srv->wait($remaining);
+        } else {
+            echo "\nCycle terminé en " . round($elapsed, 2) . " sec, lancement immédiat du prochain cycle...\n";
         }
     }
 
+    echo "\nFin de la connexion ou erreur Modbus, fermeture du client.\n";
+    $conn->close();
 });

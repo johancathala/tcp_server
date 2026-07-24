@@ -14,6 +14,7 @@ return array(
     'Psr\\Clock\\' => array($vendorDir . '/psr/clock/src'),
     'InitPHP\\Socket\\' => array($vendorDir . '/initphp/socket/src'),
     'Epever\\' => array($baseDir . '/lib/Epever'),
+    'Config\\' => array($baseDir . '/config'),
     'Carbon\\Doctrine\\' => array($vendorDir . '/carbonphp/carbon-doctrine-types/src/Carbon/Doctrine'),
     'Carbon\\' => array($vendorDir . '/nesbot/carbon/src/Carbon'),
 );
