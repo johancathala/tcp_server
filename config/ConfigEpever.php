@@ -10,12 +10,9 @@ class ConfigEpever
     public $pollIntervalSeconds = 30.0; // temps total souhaité entre deux cycles de lecture
     public $betweenReadsSeconds = 2.0; // délai entre les deux requêtes Modbus du cycle
 
-<<<<<<< HEAD
-=======
     //private String $apiUrl = 'https://sysadyp-api-test.cerema.dev/api/v1/connecteurs/17/mesures'; // URL de l'API pour envoyer les données
     //private String $apiToken = 'GLDjeTEkfvKnDkgokDABtSkr7A2YagxH'; // Token d'authentification pour l'API
 
->>>>>>> 96c761a1c6ca80c0bebb4cc48e5b6f9cb2bf3eea
     private String $apiUrl = 'https://api.sami.cerema.fr/api/v1/connecteurs/27/mesures'; // URL de l'API pour envoyer les données
     private String $apiToken = 'wXducAVT2AEZwFCU4DoiKwDSoeqgJfRK'; // Token d'authentification pour l'API
 
