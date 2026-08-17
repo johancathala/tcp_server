@@ -186,6 +186,14 @@ class EpeverClient
     }
 
     /**
+     * Convertit une valeur 32 bits non signée en entier signé sur 32 bits.
+     */
+    private function toSignedInt32(int $value): int
+    {
+        return $value >= 0x80000000 ? $value - 0x100000000 : $value;
+    }
+
+    /**
      * Lire une plage de registres (fonction 03 ou 04), vérifie CRC et retourne
      * un tableau associatif adresse_hex => valeur (entier 16 bits)
      */
@@ -264,7 +272,7 @@ class EpeverClient
         foreach ($registers as $addr => [$value, $hexValue, $byteCount] ) {
             if (isset($map[$addr])) {
                 [$key, $scale, $unit] = $map[$addr];
-                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $value / $scale : $value, "meta" => ["addr" => $addr, "unite" => $unit]];
+                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $value / $scale : $value, "_meta" => ["addr" => $addr, "unite" => $unit]];
                 array_push($valid,$mesure);
                 continue;
             }
@@ -274,15 +282,16 @@ class EpeverClient
                 if (!isset($registers[$addr]) || !isset($registers[$highAddr])) {
                     continue;
                 }
-                $lowValue = $registers[$addr][0];
-                $highValue = $registers[$highAddr][0];
-                $combinedValue = ($highValue << 16) | $lowValue;
-                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $combinedValue / $scale : $combinedValue, "meta" => ["addr" => $addr, "highAddr" => $highAddr, "unite" => $unit]];
+                $lowValue = (int) $registers[$addr][0];
+                $highValue = (int) $registers[$highAddr][0];
+                $combinedRaw = (($highValue & 0xFFFF) << 16) | ($lowValue & 0xFFFF);
+                $combinedValue = $this->toSignedInt32($combinedRaw);
+                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $combinedValue / $scale : $combinedValue, "_meta" => ["addr" => $addr, "highAddr" => $highAddr, "unite" => $unit]];
                 array_push($valid,$mesure);
                 continue;
             }
 
-            array_push($noMap, ["capteur_id" => $addr, "timestamp" => $timestamp, "valeur" => $value, "meta" => ["hexValue" => $hexValue, "byteCount" => $byteCount]]);
+            array_push($noMap, ["capteur_id" => $addr, "timestamp" => $timestamp, "valeur" => $value, "_meta" => ["hexValue" => $hexValue, "byteCount" => $byteCount]]);
         }
 
         return ['valid' => $valid, 'noMap' => $noMap];

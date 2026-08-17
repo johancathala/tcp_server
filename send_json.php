@@ -164,6 +164,38 @@ function processQueue(string $baseDir, string $archiveDir, string $failedDir, st
     return $result;
 }
 
+function cleanupOldJsonFiles(string $directory, int $days = 30): int
+{
+    if (!is_dir($directory)) {
+        return 0;
+    }
+
+    $cutoff = time() - ($days * 24 * 60 * 60);
+    $deleted = 0;
+    $files = glob(rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*.json');
+
+    if ($files === false) {
+        return 0;
+    }
+
+    foreach ($files as $filePath) {
+        if (!is_file($filePath)) {
+            continue;
+        }
+
+        if (filemtime($filePath) < $cutoff) {
+            if (unlink($filePath)) {
+                echo "  🗑️ Fichier supprimé (plus de {$days} jours) : " . basename($filePath) . "\n";
+                $deleted++;
+            } else {
+                echo "  ⚠️ Impossible de supprimer : " . basename($filePath) . "\n";
+            }
+        }
+    }
+
+    return $deleted;
+}
+
 function printSummary(array $summary, string $clientId): void
 {
     echo "\nRésumé pour client {$clientId} :\n";
@@ -179,6 +211,15 @@ function run(string $clientId, string $baseDir, string $archiveDir, string $fail
     echo "Watch mode : " . ($watch ? 'oui' : 'non') . "\n";
 
     do {
+        $purgedArchive = cleanupOldJsonFiles($archiveDir, 30);
+        $purgedFailed = cleanupOldJsonFiles($failedDir, 30);
+
+        if ($purgedArchive > 0 || $purgedFailed > 0) {
+            echo "  Nettoyage des anciens fichiers JSON : archive={$purgedArchive}, failed={$purgedFailed}\n";
+        }else {
+            echo "  Aucun ancien fichier JSON à nettoyer.\n";
+        }
+
         $summary = processQueue($baseDir, $archiveDir, $failedDir, $apiUrl, $apiToken);
         printSummary($summary, $clientId);
 
