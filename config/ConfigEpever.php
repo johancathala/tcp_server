@@ -18,7 +18,10 @@ class ConfigEpever
 
     // tableau des commandes Modbus à lire, chaque élément est un tableau contenant l'adresse de départ, le nombre de registres à lire et le type de données (1 pour entier, 2 pour flottant, 3 pour double, 4 pour chaîne) 
     private $list_cmd = [
-        [0x3100, 14, 4],
+       // [0x3100, 14, 4],
+        [0x3100, 2, 4],
+        [0x3102, 2, 4],
+        [0x310C, 2, 4],
         [0x3110, 4, 4],
         [0x311A, 1, 4],
         [0x3304 , 2, 4],
