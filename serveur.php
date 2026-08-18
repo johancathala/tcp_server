@@ -91,6 +91,7 @@ function(
         
 
         $allRegisters = [];
+        $l = 1;
         foreach ($list_cmd as $cmd) {
             $address = $cmd[0];
             $count = $cmd[1];
@@ -102,10 +103,11 @@ function(
             }
             $allRegisters = array_merge($allRegisters, $registers);
 
-            if ($betweenReadsSeconds > 0) {
+            if ($betweenReadsSeconds > 0 && $l < count($list_cmd)) {
                 echo "Attente de {$betweenReadsSeconds} secondes avant la prochaine requête...\n";
                 $srv->wait($betweenReadsSeconds);
             }
+            $l += 1;
         }
 
         if (!empty($allRegisters)) {
