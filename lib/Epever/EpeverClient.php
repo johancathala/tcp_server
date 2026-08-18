@@ -186,6 +186,14 @@ class EpeverClient
     }
 
     /**
+     * Convertit une valeur 16 bits non signée en entier signé sur 16 bits.
+     */
+    private function toSignedInt16(int $value): int
+    {
+        return $value >= 0x8000 ? $value - 0x10000 : $value;
+    }
+
+    /**
      * Convertit une valeur 32 bits non signée en entier signé sur 32 bits.
      */
     private function toSignedInt32(int $value): int
@@ -272,7 +280,8 @@ class EpeverClient
         foreach ($registers as $addr => [$value, $hexValue, $byteCount] ) {
             if (isset($map[$addr])) {
                 [$key, $scale, $unit] = $map[$addr];
-                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $value / $scale : $value, "_meta" => ["addr" => $addr, "unite" => $unit]];
+                $signedValue = $this->toSignedInt16($value);
+                $mesure = ["capteur_id" => $key, "timestamp" => $timestamp, "valeur" => $scale !== 0 ? $signedValue / $scale : $signedValue, "_meta" => ["addr" => $addr, "unite" => $unit]];
                 array_push($valid,$mesure);
                 continue;
             }
