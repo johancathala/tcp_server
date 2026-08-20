@@ -99,11 +99,16 @@ function(
             $registers = $epever->readRegisters($address, $count, 4, true);
             if (!is_array($registers)) {
                 echo "  ⚠️ Aucun registre lu pour 0x".dechex($address)."\n";
+                if ($l < count($list_cmd)) {
+                    echo "Attente de {$betweenReadsSeconds} secondes avant la prochaine requête...\n";
+                    $srv->wait($betweenReadsSeconds);
+                }
+                $l += 1;
                 break;
             }
             $allRegisters = array_merge($allRegisters, $registers);
 
-            if ($betweenReadsSeconds > 0 && $l < count($list_cmd)) {
+            if ($l < count($list_cmd)) {
                 echo "Attente de {$betweenReadsSeconds} secondes avant la prochaine requête...\n";
                 $srv->wait($betweenReadsSeconds);
             }
