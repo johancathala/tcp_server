@@ -9,16 +9,12 @@ class ConfigEpever
     private String $idMacClient = 'd4ad20dd3c8c'; // identifiant unique du client (peut être n'importe quelle valeur unique)
     public $pollIntervalSeconds = 60.0; // temps total souhaité entre deux cycles de lecture
     public $betweenReadsSeconds = 4.0; // délai entre les deux requêtes Modbus du cycle
-
-    //private String $apiUrl = 'https://sysadyp-api-test.cerema.dev/api/v1/connecteurs/17/mesures'; // URL de l'API pour envoyer les données
-    //private String $apiToken = 'GLDjeTEkfvKnDkgokDABtSkr7A2YagxH'; // Token d'authentification pour l'API
-
     private String $apiUrl = 'https://api.sami.cerema.fr/api/v1/connecteurs/27/mesures'; // URL de l'API pour envoyer les données
     private String $apiToken = 'wXducAVT2AEZwFCU4DoiKwDSoeqgJfRK'; // Token d'authentification pour l'API
 
-    // tableau des commandes Modbus à lire, chaque élément est un tableau contenant l'adresse de départ, le nombre de registres à lire et le type de données (1 pour entier, 2 pour flottant, 3 pour double, 4 pour chaîne) 
+    // tableau des commandes Modbus à lire, chaque élément est un tableau contenant l'adresse de départ,
+    //le nombre de registres à lire et le type de données (1 pour entier, 2 pour flottant, 3 pour double, 4 pour chaîne) 
     private $list_cmd = [
-       // [0x3100, 14, 4],
         [0x3100, 2, 4],
         [0x3102, 2, 4],
         [0x310C, 2, 4],
