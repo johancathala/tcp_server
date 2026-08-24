@@ -221,13 +221,13 @@ class EpeverClient
             return null;
         }
 
-        $minBytes = 5 + (2 * $count); // Slave ID + Function + Byte Count + CRC (2 bytes)
-        echo "    [DEBUG] Réponse attendue : {$minBytes} bytes pour {$count} registres\n";
+        $nbBytes = 5 + (2 * $count); // Slave ID + Function + Byte Count + CRC (2 bytes)
+        echo "    [DEBUG] Réponse attendue : {$nbBytes} bytes pour {$count} registres\n";
         if ($debug) {
             echo "    [DEBUG] Réponse reçue (" . strlen($response) . " bytes) : " . bin2hex($response) . "\n";
         }
 
-        if (strlen($response) !== $minBytes) {
+        if (strlen($response) !== $nbBytes) {
             if ($debug) echo "    [DEBUG] Le nombre de bytes reçus ne correspond pas à la réponse attendue (" . strlen($response) . " bytes)\n";
             return null;
         }

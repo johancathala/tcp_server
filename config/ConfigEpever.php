@@ -7,8 +7,8 @@ class ConfigEpever
     public $host = '0.0.0.0'; // adresse IP d'écoute du serveur TCP
     public $port = 82; // port d'écoute du serveur TCP
     private String $idMacClient = 'd4ad20dd3c8c'; // identifiant unique du client (peut être n'importe quelle valeur unique)
-    public $pollIntervalSeconds = 30.0; // temps total souhaité entre deux cycles de lecture
-    public $betweenReadsSeconds = 2.0; // délai entre les deux requêtes Modbus du cycle
+    public $pollIntervalSeconds = 60.0; // temps total souhaité entre deux cycles de lecture
+    public $betweenReadsSeconds = 4.0; // délai entre les deux requêtes Modbus du cycle
 
     //private String $apiUrl = 'https://sysadyp-api-test.cerema.dev/api/v1/connecteurs/17/mesures'; // URL de l'API pour envoyer les données
     //private String $apiToken = 'GLDjeTEkfvKnDkgokDABtSkr7A2YagxH'; // Token d'authentification pour l'API
