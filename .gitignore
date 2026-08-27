@@ -1,5 +1,5 @@
-.vscode/
-vendor/
-data/
+.vscode
+vendor
+data
 workspace.code-workspace
 composer.phar
