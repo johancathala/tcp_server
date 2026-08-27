@@ -66,10 +66,9 @@ function(
     if (!$testUser) {
         echo "⚠️ Identifiant client non reconnu, fermeture de la connexion.\n";
         $conn->close();
-        
-        echo "\nAttente de {$pollIntervalSeconds} sec avant le prochain cycle de connexion...\n";
-            $srv->wait($pollIntervalSeconds);
-        return;
+
+        echo "Redémarrage complet du serveur demandé.\n";
+        exit(1);
     }else {
         echo "✅ Identifiant client reconnu, démarrage du cycle de lecture Modbus.\n";
     }
