@@ -78,7 +78,6 @@ function(
 
     $epever = new EpeverClient($conn, 1, false);
     
-
     while ($conn->isAlive()) {
         echo "\n--- Nouveau cycle de lecture Modbus ---\n";
         $cycleStart = microtime(true);
@@ -86,7 +85,7 @@ function(
         echo "Lecture IP client\n";
         $clientIP = $epever->checkClient();
         echo "IP client : {$clientIP}\n";
-
+ 
         $allRegisters = [];
         $l = 1;
         foreach ($list_cmd as $cmd) {
@@ -96,8 +95,8 @@ function(
             $registers = $epever->readRegisters($address, $count, 4, true);
             if (!is_array($registers)) {
                 echo "  ⚠️ Aucun registre lu pour 0x".dechex($address)."\n";
-                echo "Lecture interrompue, passage au cycle suivant après l'attente.\n";
-                break;
+                echo "Erreur Modbus détectée\n";
+                break 2;
             }
 
             $allRegisters = array_merge($allRegisters, $registers);
@@ -138,6 +137,6 @@ function(
         }
     }
 
-    echo "\nFin de la connexion ou erreur Modbus, fermeture du client.\n";
+    echo "\nFin de la connexion, fermeture du client.\n";
     $conn->close();
 });
